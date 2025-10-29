@@ -69,7 +69,29 @@ class Website:
         if len(res.text) > 5000:
             raise Exception(f"Login failed with status code: {res.status_code}")
 
-    def get_courses_grades(self):
+    def get_course_schedule(self, term = "20251", week = "9"):
+        headers = {
+            "Host":"172.13.1.32",
+            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0",
+            "Accept":"application/json, text/javascript, */*; q=0.01",
+            "Accept-Encoding":"gzip, deflate",
+            "X-Requested-With":"XMLHttpRequest",
+            "Sec-GPC":"1",
+            "Connection":"keep-alive",
+            "Referer":"http://172.13.1.32/xsgrkbcx!xskbList.action?xnxqdm={}&zc={}".format(term, week),
+            "Pragma":"no-cache",
+            "Cache-Control":"no-cache"
+        }
+        headers["Cookie"] = self.cookie
+        url = "http://172.13.1.32/xsgrkbcx!getKbRq.action?xnxqdm={}&zc={}".format(term, week)
+        try:
+            res = requests.get(url, headers=headers)
+            return res.json()
+        except Exception as e:
+            print(f"Error fetching course schedule: {e}")
+
+
+    def get_course_grades(self, term = "20242"):
         headers = {
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Encoding": "gzip, deflate",
@@ -86,7 +108,7 @@ class Website:
         headers["Cookie"] = self.cookie
         url = "http://172.13.1.32/xskccjxx!getDataList.action"
         data = {
-            "xnxqdm": "20242",
+            "xnxqdm": term,
             "jhlxdm": "",
             "page": "1",
             "rows": "20",
