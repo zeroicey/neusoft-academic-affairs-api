@@ -1,54 +1,62 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Optional
-from database import DatabaseManager
+from typing import List, Optional
+from fastapi import FastAPI, Query, HTTPException
+from website import Website
 
-app = FastAPI(title="Neusoft Academic Affairs API", version="0.0.1")
-
-db_manager = DatabaseManager()
-
-class LoginRequest(BaseModel):
-    stu_num: str
-    stu_pwd: str
-    
-class LoginResponse(BaseModel):
-    success: bool
-    message: str
-    stu_num: Optional[str] = None
-    stu_name: Optional[str] = None
-    cookie: Optional[str] = None
-
-@app.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest) -> LoginResponse:
-    print(request.stu_num, request.stu_pwd)
+app = FastAPI()
 
 
-    # Query database, is there a valid cookie for stu_num?
-    # If valid cookie exists:
-    #   try to use it to access protected resource
-    #   if access is successful:
-    #       return LoginResponse with success=True and cookie info
-    #   else:
-    #       proceed to login with stu_num and stu_pwd
-    # If no valid cookie:
-    #   proceed to login with stu_num and stu_pwd
+@app.get("/schedule")
+def get_schedule(
+    studentNo: Optional[str] = Query(None),
+    term: str = Query(..., description="学期，如 2024-2025-1"),
+    week: Optional[int] = Query(None, ge=1, le=25),
+):
+    # TODO: 查询并返回课表数据
+    return {"studentNo": studentNo, "term": term, "week": week, "items": []}
 
-    valid_cookie = db_manager.get_valid_cookie(request.stu_num)
-    if (valid_cookie):
-        # Here, you would normally verify the cookie by accessing a protected resource.
-        # For simplicity, we assume the cookie is valid.
-        return LoginResponse(
-            success=True,
-            message="Login successful with cached cookie",
-            stu_num=request.stu_num,
-            stu_name="Student Name",
-            cookie=valid_cookie
+
+@app.get("/grades")
+def get_grades(
+    studentNo: str = Query(..., description="学号"),
+    password: str = Query(..., description="密码"),
+    term: Optional[str] = Query(None, description="学期，可选"),
+):
+    """
+    获取学生成绩
+    按照流程：get_cookie() -> login() -> get_courses_grades() -> logout()
+    """
+    try:
+        # 创建Website实例
+        website = Website(studentNo, password)
+        
+        # 1. 获取cookie
+        website.get_cookie()
+        
+        # 2. 登录
+        website.login()
+        
+        # 3. 获取成绩数据
+        grades_data = website.get_courses_grades()
+        
+        # 4. 登出
+        website.logout()
+        
+        return {
+            "studentNo": studentNo,
+            "term": term,
+            "success": True,
+            "items": grades_data or []
+        }
+        
+    except Exception as e:
+        # 确保在出错时也尝试登出
+        try:
+            if 'website' in locals():
+                website.logout()
+        except:
+            pass
+            
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取成绩失败: {str(e)}"
         )
-
-    return LoginResponse(
-        success=True,
-        message="Login successful",
-        stu_num=request.stu_num,
-        stu_name="Student Name",
-        cookie="cookie_value"
-    )
